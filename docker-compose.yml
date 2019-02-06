@@ -1,0 +1,419 @@
+#Reference: https://www.smarthomebeginner.com/traefik-reverse-proxy-tutorial-for-docker
+#Requirement: Set environmental variables: ${$USERDIR}, ${PUID}, ${PGID}, ${TZ}, ${DOMAINNAME}, ${CLOUDFLARE_EMAIL},  ${CLOUDFLARE_API_KEY}, ${HTTP_USERNAME}, ${HTTP_PASSWORD}, etc. as explained in the reference.
+
+version: "3.6"
+services:
+
+######### FRONTENDS ##########
+
+# Traefik Reverse Proxy
+  traefik:
+    hostname: traefik
+    image: traefik:latest
+    container_name: traefik
+    restart: always
+    domainname: ${DOMAINNAME}
+    environment:
+      - DO_AUTH_TOKEN=${DO_AUTH_TOKEN} 
+    networks:
+      - default
+      - traefik_proxy
+    ports:
+      - "80:80"
+      - "443:443"
+#      - "XXXX:8080"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=traefik"
+      - "traefik.frontend.rule=Host:monitor.${DOMAINNAME}"  
+#      - "traefik.frontend.rule=Host:${DOMAINNAME}; PathPrefixStrip: /traefik"
+      - "traefik.port=8080"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.frontend.headers.SSLRedirect=true"
+      - "traefik.frontend.headers.STSSeconds=315360000"
+      - "traefik.frontend.headers.browserXSSFilter=true"
+      - "traefik.frontend.headers.contentTypeNosniff=true"
+      - "traefik.frontend.headers.forceSTSHeader=true"
+      - "traefik.frontend.headers.SSLHost=ppsmartbot.com"
+      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+      - "traefik.frontend.headers.STSPreload=true"
+      - "traefik.frontend.headers.frameDeny=true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${USERDIR}/traefik:/etc/traefik
+      - ${USERDIR}/shared:/shared
+
+ #Portainer - WebUI for Containers
+  portainer:
+    image: portainer/portainer
+    container_name: portainer
+    restart: always
+    command: -H unix:///var/run/docker.sock
+#    ports:
+#      - "XXXX:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${USERDIR}/portainer/data:/data
+      - ${USERDIR}/shared:/shared
+    environment:
+      - TZ=${TZ}
+    networks:
+      - traefik_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=portainer"
+      - "traefik.frontend.rule=Host:portainer.${DOMAINNAME}"  
+#      - "traefik.frontend.rule=Host:${DOMAINNAME}; PathPrefixStrip: /portainer"
+      - "traefik.port=9000"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.frontend.headers.SSLRedirect=true"
+      - "traefik.frontend.headers.STSSeconds=315360000"
+      - "traefik.frontend.headers.browserXSSFilter=true"
+      - "traefik.frontend.headers.contentTypeNosniff=true"
+      - "traefik.frontend.headers.forceSTSHeader=true"
+      - "traefik.frontend.headers.SSLHost=ppsmartbot.com"
+      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+      - "traefik.frontend.headers.STSPreload=true"
+      - "traefik.frontend.headers.frameDeny=true"
+
+# Organizer - Unified HTPC/Home Server Web Interface
+  organizr:
+    container_name: organizr
+    restart: always
+    image: lsiocommunity/organizr
+    volumes:
+      - ${USERDIR}/organizr:/config
+      - ${USERDIR}/shared:/shared
+#    ports:
+#      - "XXXX:80"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    networks:
+      - traefik_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=organizr"
+      - "traefik.frontend.rule=Host:organizr.${DOMAINNAME}"  
+#      - "traefik.frontend.rule=Host:${DOMAINNAME}; PathPrefixStrip: /organizr"
+      - "traefik.port=80"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.frontend.headers.SSLRedirect=true"
+      - "traefik.frontend.headers.STSSeconds=315360000"
+      - "traefik.frontend.headers.browserXSSFilter=true"
+      - "traefik.frontend.headers.contentTypeNosniff=true"
+      - "traefik.frontend.headers.forceSTSHeader=true"
+      - "traefik.frontend.headers.SSLHost=ppsmartbot.com"
+      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+      - "traefik.frontend.headers.STSPreload=true"
+      - "traefik.frontend.headers.frameDeny=true"
+
+# phpMyAdmin - WebUI for MariaDB
+  phpmyadmin:
+    hostname: phpmyadmin
+    container_name: phpmyadmin
+    image: phpmyadmin/phpmyadmin
+    restart: always
+    links:
+      - mariadb:db
+#    ports:
+#      - XXXX:80
+    environment:
+      - PMA_HOST=mariadb
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    networks:
+      - traefik_proxy
+      - default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=phpmyadmin"
+      - "traefik.frontend.rule=Host:pma.${DOMAINNAME}"
+      - "traefik.port=80"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.frontend.headers.SSLRedirect=true"
+      - "traefik.frontend.headers.STSSeconds=315360000"
+      - "traefik.frontend.headers.browserXSSFilter=true"
+      - "traefik.frontend.headers.contentTypeNosniff=true"
+      - "traefik.frontend.headers.forceSTSHeader=true"
+      - "traefik.frontend.headers.SSLHost=ppsmartbot.com"
+      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+      - "traefik.frontend.headers.STSPreload=true"
+      - "traefik.frontend.headers.frameDeny=true"
+
+######### DOCKER RELATED ##########
+
+# Watchtower - Automatic Update of Containers/Apps
+  watchtower:
+    container_name: watchtower
+    hostname: watchtower
+    restart: always
+    image: v2tec/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --schedule "0 0 4 * * *" --cleanup
+
+######### SMART HOME APPS ##########
+
+# Home Assistant - Smart Home Hub
+  homeassistant:
+    container_name: homeassistant
+    restart: always
+    image: homeassistant/home-assistant
+    #devices:
+    #  - /dev/ttyUSB0:/dev/ttyUSB0
+    #  - /dev/ttyUSB1:/dev/ttyUSB1
+    #  - /dev/ttyACM0:/dev/ttyACM0
+    volumes:
+      - ${USERDIR}/homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+      - ${USERDIR}/shared:/shared
+    ports:
+      - "8123:8123"
+#      - "XXXX:8123"
+    privileged: true
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    networks:
+      - traefik_proxy
+      - default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=homeassistant"
+      - "traefik.frontend.rule=Host:hass.${DOMAINNAME}"
+      - "traefik.port=8123"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.frontend.headers.SSLRedirect=true"
+      - "traefik.frontend.headers.STSSeconds=315360000"
+      - "traefik.frontend.headers.browserXSSFilter=true"
+      - "traefik.frontend.headers.contentTypeNosniff=true"
+      - "traefik.frontend.headers.forceSTSHeader=true"
+      - "traefik.frontend.headers.SSLHost=ppsmartbot.com"
+      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+      - "traefik.frontend.headers.STSPreload=true"
+      - "traefik.frontend.headers.frameDeny=true"
+
+
+######### UTILITIES ##########
+
+# MariaDB – Database Server for your Apps
+  mariadb:
+    image: "linuxserver/mariadb"
+    container_name: "mariadb"
+    hostname: mariadb
+    volumes:
+      - ${USERDIR}/mariadb:/config
+    ports:
+      - target: 3306
+        published: 3306
+        protocol: tcp
+        mode: host
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    networks:
+      - default
+    labels:
+      - "traefik.enable=false"
+
+  postgres:
+    container_name: postgres
+    image: postgres:alpine
+    ports:
+      - "5432:5432"
+    restart: always
+    volumes:
+      - ${USERDIR}/postgres:/var/lib/postgresql/data
+      - ${USERDIR}/shared:/shared
+    environment:
+      - POSTGRES_USER=${DBUSER}
+      - POSTGRES_PASSWORD=${DBPASS}
+      - POSTGRES_DB=${DBNAME}
+      - TZ=${TZ}
+    labels:
+      - "traefik.enable=true"
+
+  owntracks:
+    restart: always
+    container_name: owntracks
+    image: owntracks/recorder
+    ports:
+      - 8083:8083
+    volumes:
+      - ${USERDIR}/owntracks/config:/owntracks
+      - ${USERDIR}/owntracks/store:/store
+    restart: unless-stopped
+    environment:
+      - OTR_HOST=mosquitto
+    labels:
+      - "traefik.enable=true"
+
+  mosquitto:
+    image: eclipse-mosquitto
+    ports:
+      - 1883:1883
+      - 8883:8883
+    volumes:
+      - ${USERDIR}/mosquitto/data:/mosquitto/data
+      - ${USERDIR}/mosquitto/logs:/mosquitto/logs
+      - ${USERDIR}/mosquitto/conf:/mosquitto/config
+      - ${USERDIR}/mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    restart: always
+    labels:
+      - "traefik.enable=false"
+
+    #    ##################### ICECASTS ####################
+  icecast-chum:
+    image: stephanel/icecast-kh
+    volumes:
+      - ${USERDIR}/icecasts/chum/logs:/var/log/icecast2
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - 9112:8000
+    restart: always
+    environment:
+      - ICECAST_SOURCE_PASSWORD=${ICECAST_SOURCE_PASSWORD_CHUM}
+      - ICECAST_ADMIN_PASSWORD=${ICECAST_ADMIN_PASSWORD_CHUM}
+      - ICECAST_PASSWORD=${ICECAST_PASSWORD_CHUM}
+      - ICECAST_RELAY_PASSWORD=${ICECAST_RELAY_PASSWORD_CHUM}
+    labels:
+      - "traefik.enable=false"
+    
+  icecast-phimai:
+    image: stephanel/icecast-kh
+    volumes:
+      - ${USERDIR}/icecasts/phimai/logs:/var/log/icecast2
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - 9996:8000
+    restart: always
+    environment:
+      - ICECAST_SOURCE_PASSWORD=${ICECAST_SOURCE_PASSWORD_PHI}
+      - ICECAST_ADMIN_PASSWORD=${ICECAST_ADMIN_PASSWORD_PHI}
+      - ICECAST_PASSWORD=${ICECAST_PASSWORD_PHI}
+      - ICECAST_RELAY_PASSWORD=${ICECAST_RELAY_PASSWORD_PHI}
+    labels:
+      - "traefik.enable=false"
+  
+  icecast-phimai2:
+    image: stephanel/icecast-kh
+    volumes:
+      - ${USERDIR}/icecasts/phimai2/logs:/var/log/icecast2
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - 9212:8000
+    restart: always
+    environment:
+      - ICECAST_SOURCE_PASSWORD=${ICECAST_SOURCE_PASSWORD_PHI2}
+      - ICECAST_ADMIN_PASSWORD=${ICECAST_ADMIN_PASSWORD_PHI2}
+      - ICECAST_PASSWORD=${ICECAST_PASSWORD_PHI2}
+      - ICECAST_RELAY_PASSWORD=${ICECAST_RELAY_PASSWORD_PHI2}
+    labels:
+      - "traefik.enable=false"
+  
+  icecast-krich:
+    image: stephanel/icecast-kh
+    volumes:
+      - ${USERDIR}/icecasts/krich/logs:/var/log/icecast2
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+        - 3333:8000
+    restart: always
+    environment:
+      - ICECAST_SOURCE_PASSWORD=${ICECAST_SOURCE_PASSWORD_KRICH}
+      - ICECAST_ADMIN_PASSWORD=${ICECAST_ADMIN_PASSWORD_KRICH}
+      - ICECAST_PASSWORD=${ICECAST_PASSWORD_KRICH}
+      - ICECAST_RELAY_PASSWORD=${ICECAST_RELAY_PASSWORD_KRICH}
+    labels:
+      - "traefik.enable=false"
+        
+  icecast-king:
+    image: stephanel/icecast-kh
+    volumes:
+      - ${USERDIR}/icecasts/king/logs:/var/log/icecast2
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - 1929:8000
+    restart: always
+    environment:
+      - ICECAST_SOURCE_PASSWORD=${ICECAST_SOURCE_PASSWORD_KING}
+      - ICECAST_ADMIN_PASSWORD=${ICECAST_ADMIN_PASSWORD_KING}
+      - ICECAST_PASSWORD=${ICECAST_PASSWORD_KING}
+      - ICECAST_RELAY_PASSWORD=${ICECAST_RELAY_PASSWORD_KING}
+    labels:
+      - "traefik.enable=false"
+   #########################################################
+    # BLOG
+    # ######################################################
+
+  wp-ppsmartbot:
+    image: wordpress
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=wp-ppsmartbot"
+      - "traefik.frontend.rule=Host:${DOMAINNAME}"  
+      - "traefik.port=80"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.frontend.headers.SSLRedirect=true"
+      - "traefik.frontend.headers.STSSeconds=315360000"
+      - "traefik.frontend.headers.browserXSSFilter=true"
+      - "traefik.frontend.headers.contentTypeNosniff=true"
+      - "traefik.frontend.headers.forceSTSHeader=true"
+      - "traefik.frontend.headers.SSLHost=ppsmartbot.com"
+      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+      - "traefik.frontend.headers.STSPreload=true"
+      - "traefik.frontend.headers.frameDeny=true"
+    volumes:
+      - ./ppsmartbot.com/config/php.conf.ini:/usr/local/etc/php/conf.d/conf.ini
+      - ./ppsmartbot.com/wp-app:/var/www/html # Full wordpress project
+      #- ./plugin-name/trunk/:/var/www/html/wp-content/plugins/plugin-name # Plugin development
+      #- ./theme-name/trunk/:/var/www/html/wp-content/themes/theme-name # Theme development
+    environment:
+      - WORDPRESS_DB_HOST=${WORDPRESS_DB_HOST}
+      - WORDPRESS_DB_NAME=${WORDPRESS_DB_NAME}
+      - WORDPRESS_DB_USER=${WORDPRESS_DB_USER}
+      - WORDPRESS_DB_PASSWORD=${WORDPRESS_DB_PASSWORD}
+      - WORDPRESS_TABLE_PREFIX=${WORDPRESS_TABLE_PREFIX}
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    networks:
+      - traefik_proxy
+      - default
+    depends_on:
+      - mariadb
+    restart: always
+        
+#  adminer:
+#    Database management in a single PHP file
+#    image: adminer:4.6.3-standalone
+#    labels:
+#      - "traefik.enable=true"
+#      - "traefik.backend=adminer"
+#      - "traefik.frontend.rule=Host:dbbot.${DOMAINNAME}"  
+#      - "traefik.port=8887"
+#      - "traefik.docker.network=traefik_proxy"
+#      - "traefik.frontend.headers.SSLRedirect=true"
+#      - "traefik.frontend.headers.STSSeconds=315360000"
+#      - "traefik.frontend.headers.browserXSSFilter=true"
+#      - "traefik.frontend.headers.contentTypeNosniff=true"
+#      - "traefik.frontend.headers.forceSTSHeader=true"
+#      - "traefik.frontend.headers.SSLHost=ppsmartbot.com"
+#      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+#      - "traefik.frontend.headers.STSPreload=true"
+#      - "traefik.frontend.headers.frameDeny=true"
+#    networks:
+#      - default
+#      - traefik_proxy
+#
+networks:
+  traefik_proxy:
+    external:
+      name: traefik_proxy
+  default:
+    driver: bridge
